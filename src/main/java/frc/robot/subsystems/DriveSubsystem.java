@@ -25,6 +25,7 @@ import edu.wpi.first.wpilibj.ADIS16470_IMU;
 import edu.wpi.first.wpilibj.ADIS16470_IMU.IMUAxis;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.wpilibj.Timer;
 import frc.robot.Constants.DriveConstants;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
@@ -82,6 +83,9 @@ public class DriveSubsystem extends SubsystemBase {
   /** Last commanded chassis speeds (robot-relative) for simulation integration. */
   private ChassisSpeeds m_lastChassisSpeeds = new ChassisSpeeds();
 
+  /** Last time in seconds for sim integration dt. */
+  private double m_lastSimTime = Timer.getFPGATimestamp();
+
   /** Creates a new DriveSubsystem. */
   public DriveSubsystem() {
     // Usage reporting for MAXSwerve template
@@ -110,11 +114,18 @@ public class DriveSubsystem extends SubsystemBase {
     }
   }
 
+  /** True when we are not on the real robot (desktop/sim); use integrated pose for Advantage Scope. */
+  private static boolean useIntegratedPose() {
+    return !RobotBase.isReal();
+  }
+
   @Override
   public void periodic() {
-    if (RobotBase.isSimulation()) {
-      // In sim, integrate chassis speeds so the robot moves on the 2D/3D field when you drive
-      double dt = 0.02;
+    if (useIntegratedPose()) {
+      // Not on real robot: integrate chassis speeds so the robot moves on 2D/3D field when you drive
+      double now = Timer.getFPGATimestamp();
+      double dt = Math.min(now - m_lastSimTime, 0.05); // cap dt in case of pause
+      m_lastSimTime = now;
       double vx = m_lastChassisSpeeds.vxMetersPerSecond;
       double vy = m_lastChassisSpeeds.vyMetersPerSecond;
       double omega = m_lastChassisSpeeds.omegaRadiansPerSecond;
@@ -151,7 +162,7 @@ public class DriveSubsystem extends SubsystemBase {
    * @return The pose.
    */
   public Pose2d getPose() {
-    if (RobotBase.isSimulation()) {
+    if (useIntegratedPose()) {
       return m_simPose;
     }
     return m_odometry.getPoseMeters();
@@ -191,7 +202,7 @@ public class DriveSubsystem extends SubsystemBase {
    * @param pose The pose to which to set the odometry.
    */
   public void resetOdometry(Pose2d pose) {
-    if (RobotBase.isSimulation()) {
+    if (useIntegratedPose()) {
       m_simPose = pose;
     } else {
       m_odometry.resetPosition(
@@ -221,9 +232,12 @@ public class DriveSubsystem extends SubsystemBase {
     double ySpeedDelivered = ySpeed * DriveConstants.kMaxSpeedMetersPerSecond;
     double rotDelivered = rot * DriveConstants.kMaxAngularSpeed;
 
+    // When not on real robot the gyro doesn't update; use current pose rotation for field-relative
+    Rotation2d heading = useIntegratedPose()
+        ? getPose().getRotation()
+        : Rotation2d.fromDegrees(m_gyro.getAngle(IMUAxis.kZ));
     ChassisSpeeds chassisSpeeds = fieldRelative
-        ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered,
-            Rotation2d.fromDegrees(m_gyro.getAngle(IMUAxis.kZ)))
+        ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered, heading)
         : new ChassisSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered);
     m_lastChassisSpeeds = chassisSpeeds;
 
