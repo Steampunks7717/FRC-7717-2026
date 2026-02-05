@@ -51,7 +51,7 @@ public class RobotContainer {
   public RobotContainer() {
     // PathPlanner: build chooser when AutoBuilder was configured (has RobotConfig from GUI)
     if (AutoBuilder.isConfigured()) {
-      m_pathPlannerChooser = AutoBuilder.buildAutoChooser();
+      m_pathPlannerChooser = AutoBuilder.buildAutoChooser("auto1");
       SmartDashboard.putData("Auto Chooser", m_pathPlannerChooser);
     } else {
       m_pathPlannerChooser = null;
