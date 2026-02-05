@@ -14,8 +14,15 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.StructArrayPublisher;
+import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.config.PIDConstants;
+import com.pathplanner.lib.config.RobotConfig;
+import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import edu.wpi.first.wpilibj.ADIS16470_IMU;
 import edu.wpi.first.wpilibj.ADIS16470_IMU.IMUAxis;
+import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.Constants.DriveConstants;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
@@ -55,10 +62,38 @@ public class DriveSubsystem extends SubsystemBase {
           m_rearRight.getPosition()
       });
 
+  /** Publisher for Advantage Scope: swerve module states (topic /SwerveStates). */
+  private final StructArrayPublisher<SwerveModuleState> m_swerveStatesPublisher =
+      NetworkTableInstance.getDefault()
+          .getStructArrayTopic("/SwerveStates", SwerveModuleState.struct)
+          .publish();
+
   /** Creates a new DriveSubsystem. */
   public DriveSubsystem() {
     // Usage reporting for MAXSwerve template
     HAL.report(tResourceType.kResourceType_RobotDrive, tInstances.kRobotDriveSwerve_MaxSwerve);
+
+    // PathPlanner AutoBuilder: load robot config from GUI and configure path following.
+    // If no config file exists (e.g. first run), autonomous will use WPILib fallback in RobotContainer.
+    try {
+      RobotConfig config = RobotConfig.fromGUISettings();
+      AutoBuilder.configure(
+          this::getPose,
+          this::resetOdometry,
+          this::getRobotRelativeSpeeds,
+          this::driveRobotRelative,
+          new PPHolonomicDriveController(
+              new PIDConstants(5.0, 0.0, 0.0),
+              new PIDConstants(5.0, 0.0, 0.0)),
+          config,
+          () -> {
+            var alliance = DriverStation.getAlliance();
+            return alliance.isPresent() && alliance.get() == DriverStation.Alliance.Red;
+          },
+          this);
+    } catch (Exception e) {
+      // No PathPlanner config or autos yet; getAutonomousCommand() will use WPILib default.
+    }
   }
 
   @Override
@@ -72,6 +107,14 @@ public class DriveSubsystem extends SubsystemBase {
             m_rearLeft.getPosition(),
             m_rearRight.getPosition()
         });
+    // Publish module states for Advantage Scope (Swerve tab)
+    m_swerveStatesPublisher.set(
+        new SwerveModuleState[] {
+            m_frontLeft.getState(),
+            m_frontRight.getState(),
+            m_rearLeft.getState(),
+            m_rearRight.getState()
+        });
   }
 
   /**
@@ -81,6 +124,33 @@ public class DriveSubsystem extends SubsystemBase {
    */
   public Pose2d getPose() {
     return m_odometry.getPoseMeters();
+  }
+
+  /**
+   * Returns the current robot-relative chassis speeds (vx, vy, omega).
+   * For path following and telemetry; velocities are in the robot frame.
+   *
+   * @return Current ChassisSpeeds in robot-relative frame (m/s, rad/s).
+   */
+  public ChassisSpeeds getRobotRelativeSpeeds() {
+    return DriveConstants.kDriveKinematics.toChassisSpeeds(
+        m_frontLeft.getState(),
+        m_frontRight.getState(),
+        m_rearLeft.getState(),
+        m_rearRight.getState());
+  }
+
+  /**
+   * Drives the robot using robot-relative ChassisSpeeds.
+   * PathPlanner and path-following commands use this method; speeds are robot-relative.
+   *
+   * @param speeds Desired chassis speeds in robot frame (m/s, rad/s).
+   */
+  public void driveRobotRelative(ChassisSpeeds speeds) {
+    var states = DriveConstants.kDriveKinematics.toSwerveModuleStates(speeds);
+    SwerveDriveKinematics.desaturateWheelSpeeds(
+        states, DriveConstants.kMaxSpeedMetersPerSecond);
+    setModuleStates(states);
   }
 
   /**

@@ -13,8 +13,11 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.trajectory.Trajectory;
 import edu.wpi.first.math.trajectory.TrajectoryConfig;
 import edu.wpi.first.math.trajectory.TrajectoryGenerator;
+import com.pathplanner.lib.auto.AutoBuilder;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.PS4Controller.Button;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants.AutoConstants;
 import frc.robot.Constants.DriveConstants;
 import frc.robot.Constants.OIConstants;
@@ -39,10 +42,21 @@ public class RobotContainer {
   // The driver's controller
   XboxController m_driverController = new XboxController(OIConstants.kDriverControllerPort);
 
+  /** PathPlanner auto chooser; null when PathPlanner config is not present. */
+  private final SendableChooser<Command> m_pathPlannerChooser;
+
   /**
    * The container for the robot. Contains subsystems, OI devices, and commands.
    */
   public RobotContainer() {
+    // PathPlanner: build chooser when AutoBuilder was configured (has RobotConfig from GUI)
+    if (AutoBuilder.isConfigured()) {
+      m_pathPlannerChooser = AutoBuilder.buildAutoChooser();
+      SmartDashboard.putData("Auto Chooser", m_pathPlannerChooser);
+    } else {
+      m_pathPlannerChooser = null;
+    }
+
     // Configure the button bindings
     configureButtonBindings();
 
@@ -82,10 +96,20 @@ public class RobotContainer {
 
   /**
    * Use this to pass the autonomous command to the main {@link Robot} class.
+   * When PathPlanner is configured, returns the selected auto from the chooser.
+   * Otherwise returns the default WPILib trajectory.
    *
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
+    if (m_pathPlannerChooser != null) {
+      return m_pathPlannerChooser.getSelected();
+    }
+    return getDefaultWpilibAuto();
+  }
+
+  /** Default autonomous: WPILib trajectory (used when PathPlanner config is not present). */
+  private Command getDefaultWpilibAuto() {
     // Create config for trajectory
     TrajectoryConfig config = new TrajectoryConfig(
         AutoConstants.kMaxSpeedMetersPerSecond,
@@ -125,4 +149,5 @@ public class RobotContainer {
     // Run path following command, then stop at the end.
     return swerveControllerCommand.andThen(() -> m_robotDrive.drive(0, 0, 0, false));
   }
+
 }
