@@ -16,6 +16,7 @@ import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.StructArrayPublisher;
+import edu.wpi.first.networktables.StructPublisher;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.config.RobotConfig;
@@ -23,6 +24,7 @@ import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import edu.wpi.first.wpilibj.ADIS16470_IMU;
 import edu.wpi.first.wpilibj.ADIS16470_IMU.IMUAxis;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.RobotBase;
 import frc.robot.Constants.DriveConstants;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
@@ -68,6 +70,18 @@ public class DriveSubsystem extends SubsystemBase {
           .getStructArrayTopic("/SwerveStates", SwerveModuleState.struct)
           .publish();
 
+  /** Publisher for Advantage Scope: robot pose for 2D/3D field (topic Odometry/Robot). */
+  private final StructPublisher<Pose2d> m_posePublisher =
+      NetworkTableInstance.getDefault()
+          .getStructTopic("Odometry/Robot", Pose2d.struct)
+          .publish();
+
+  /** Sim-only: pose integrated from chassis speeds so the robot moves in sim. */
+  private Pose2d m_simPose = new Pose2d();
+
+  /** Last commanded chassis speeds (robot-relative) for simulation integration. */
+  private ChassisSpeeds m_lastChassisSpeeds = new ChassisSpeeds();
+
   /** Creates a new DriveSubsystem. */
   public DriveSubsystem() {
     // Usage reporting for MAXSwerve template
@@ -98,15 +112,27 @@ public class DriveSubsystem extends SubsystemBase {
 
   @Override
   public void periodic() {
-    // Update the odometry in the periodic block
-    m_odometry.update(
-        Rotation2d.fromDegrees(m_gyro.getAngle(IMUAxis.kZ)),
-        new SwerveModulePosition[] {
-            m_frontLeft.getPosition(),
-            m_frontRight.getPosition(),
-            m_rearLeft.getPosition(),
-            m_rearRight.getPosition()
-        });
+    if (RobotBase.isSimulation()) {
+      // In sim, integrate chassis speeds so the robot moves on the 2D/3D field when you drive
+      double dt = 0.02;
+      double vx = m_lastChassisSpeeds.vxMetersPerSecond;
+      double vy = m_lastChassisSpeeds.vyMetersPerSecond;
+      double omega = m_lastChassisSpeeds.omegaRadiansPerSecond;
+      double theta = m_simPose.getRotation().getRadians();
+      double newX = m_simPose.getX() + (vx * Math.cos(theta) - vy * Math.sin(theta)) * dt;
+      double newY = m_simPose.getY() + (vx * Math.sin(theta) + vy * Math.cos(theta)) * dt;
+      m_simPose = new Pose2d(newX, newY, new Rotation2d(theta + omega * dt));
+    } else {
+      // Real robot: update odometry from gyro and module positions
+      m_odometry.update(
+          Rotation2d.fromDegrees(m_gyro.getAngle(IMUAxis.kZ)),
+          new SwerveModulePosition[] {
+              m_frontLeft.getPosition(),
+              m_frontRight.getPosition(),
+              m_rearLeft.getPosition(),
+              m_rearRight.getPosition()
+          });
+    }
     // Publish module states for Advantage Scope (Swerve tab)
     m_swerveStatesPublisher.set(
         new SwerveModuleState[] {
@@ -115,6 +141,8 @@ public class DriveSubsystem extends SubsystemBase {
             m_rearLeft.getState(),
             m_rearRight.getState()
         });
+    // Publish pose for Advantage Scope (2D Field / 3D Field tab)
+    m_posePublisher.set(getPose());
   }
 
   /**
@@ -123,6 +151,9 @@ public class DriveSubsystem extends SubsystemBase {
    * @return The pose.
    */
   public Pose2d getPose() {
+    if (RobotBase.isSimulation()) {
+      return m_simPose;
+    }
     return m_odometry.getPoseMeters();
   }
 
@@ -147,6 +178,7 @@ public class DriveSubsystem extends SubsystemBase {
    * @param speeds Desired chassis speeds in robot frame (m/s, rad/s).
    */
   public void driveRobotRelative(ChassisSpeeds speeds) {
+    m_lastChassisSpeeds = speeds;
     var states = DriveConstants.kDriveKinematics.toSwerveModuleStates(speeds);
     SwerveDriveKinematics.desaturateWheelSpeeds(
         states, DriveConstants.kMaxSpeedMetersPerSecond);
@@ -159,15 +191,19 @@ public class DriveSubsystem extends SubsystemBase {
    * @param pose The pose to which to set the odometry.
    */
   public void resetOdometry(Pose2d pose) {
-    m_odometry.resetPosition(
-        Rotation2d.fromDegrees(m_gyro.getAngle(IMUAxis.kZ)),
-        new SwerveModulePosition[] {
-            m_frontLeft.getPosition(),
-            m_frontRight.getPosition(),
-            m_rearLeft.getPosition(),
-            m_rearRight.getPosition()
-        },
-        pose);
+    if (RobotBase.isSimulation()) {
+      m_simPose = pose;
+    } else {
+      m_odometry.resetPosition(
+          Rotation2d.fromDegrees(m_gyro.getAngle(IMUAxis.kZ)),
+          new SwerveModulePosition[] {
+              m_frontLeft.getPosition(),
+              m_frontRight.getPosition(),
+              m_rearLeft.getPosition(),
+              m_rearRight.getPosition()
+          },
+          pose);
+    }
   }
 
   /**
@@ -185,11 +221,13 @@ public class DriveSubsystem extends SubsystemBase {
     double ySpeedDelivered = ySpeed * DriveConstants.kMaxSpeedMetersPerSecond;
     double rotDelivered = rot * DriveConstants.kMaxAngularSpeed;
 
-    var swerveModuleStates = DriveConstants.kDriveKinematics.toSwerveModuleStates(
-        fieldRelative
-            ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered,
-                Rotation2d.fromDegrees(m_gyro.getAngle(IMUAxis.kZ)))
-            : new ChassisSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered));
+    ChassisSpeeds chassisSpeeds = fieldRelative
+        ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered,
+            Rotation2d.fromDegrees(m_gyro.getAngle(IMUAxis.kZ)))
+        : new ChassisSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered);
+    m_lastChassisSpeeds = chassisSpeeds;
+
+    var swerveModuleStates = DriveConstants.kDriveKinematics.toSwerveModuleStates(chassisSpeeds);
     SwerveDriveKinematics.desaturateWheelSpeeds(
         swerveModuleStates, DriveConstants.kMaxSpeedMetersPerSecond);
     m_frontLeft.setDesiredState(swerveModuleStates[0]);
