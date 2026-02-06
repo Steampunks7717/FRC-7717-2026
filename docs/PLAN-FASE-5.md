@@ -19,14 +19,14 @@
 
 ## Tareas
 
-- [ ] **LimelightHelpers**  
-  Añadir el archivo `LimelightHelpers.java` al proyecto (repo oficial Limelight o documentación) para leer datos de la cámara vía NetworkTables.
+- [x] **Lectura de Limelight**  
+  VisionSubsystem lee directamente de NetworkTables (tabla `limelight`): tx, ty, tv, tid. No se usa LimelightHelpers; se puede añadir después si se necesita más API.
 
-- [ ] **VisionSubsystem (o integración en drive)**  
-  Crear un subsistema (o métodos en un subsistema existente) que lean de Limelight: `getTX()`, `getTY()`, `getTV()` para targeting; opcionalmente pose con `getBotPoseEstimate_wpiBlue_MegaTag2()` si se usa AprilTag.
+- [x] **VisionSubsystem**  
+  Subsistema que expone `getTx()`, `getTy()`, `hasTarget()`, `getTargetId()`, `getTagPoseFromLayout(id)`, `getTargetPoseInFrontOfTag(id, distance)` y `isSeeingTag(id)`. Layout de tags 9 y 10 en Constants (VisionConstants).
 
-- [ ] **Comandos que usan visión**  
-  Por ejemplo “AlinearseConObjetivo”: lee tx/ty (y tv), aplica un PID que genera rotación (y opcionalmente avance) y comanda el drive con `drive()` o `driveRobotRelative()`. El drive no sabe que la referencia viene de Limelight; solo recibe ChassisSpeeds o x, y, rot.
+- [x] **Comando “ir al AprilTag” (teleop)**  
+  `GoToAprilTagCommand`: al pulsar botón (A = tag 9, B = tag 10) el robot se coloca centrado frente al tag a distancia configurable. Usa trayectoria para movimiento rápido; timeout 5 s; si no ve el tag en 1 s termina sin bloquear; al soltar el botón el comando sigue hasta llegar o timeout (no se cancela).
 
 - [ ] **Pose estimation (opcional)**  
   Si se quiere corregir la pose con AprilTags: usar `SwerveDrivePoseEstimator` (WPILib). En `periodic()` del drive (o del vision), llamar `addVisionMeasurement(pose, timestamp)` cuando Limelight devuelva una pose válida (MegaTag2). El `getPose()` que usa PathPlanner sigue siendo el del drive; la visión solo corrige.
@@ -52,7 +52,9 @@
 
 ## Notas / decisiones del equipo
 
-- 
+- Botones: A = AprilTag 9, B = AprilTag 10. Constantes en `OIConstants.kGoToAprilTag9Button` y `kGoToAprilTag10Button`.
+- Poses de tags 9 y 10 en `VisionConstants.kTag9FieldPose` y `kTag10FieldPose`; actualizar desde el manual del juego.
+- Opcional: feedback cuando no hay tag (vibración, LED).
 
 ---
 

@@ -11,7 +11,9 @@ import edu.wpi.first.wpilibj.PS4Controller.Button;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants.OIConstants;
+import frc.robot.commands.GoToAprilTagCommand;
 import frc.robot.subsystems.DriveSubsystem;
+import frc.robot.subsystems.VisionSubsystem;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
@@ -26,6 +28,7 @@ import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 public class RobotContainer {
   // The robot's subsystems
   private final DriveSubsystem m_robotDrive = new DriveSubsystem();
+  private final VisionSubsystem m_vision = new VisionSubsystem();
 
   // The driver's controller
   XboxController m_driverController = new XboxController(OIConstants.kDriverControllerPort);
@@ -80,6 +83,12 @@ public class RobotContainer {
         .onTrue(new InstantCommand(
             () -> m_robotDrive.zeroHeading(),
             m_robotDrive));
+
+    // Teleop: one button = position robot centered in front of AprilTag (fast, with timeout)
+    new JoystickButton(m_driverController, OIConstants.kGoToAprilTag9Button)
+        .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision, 9));
+    new JoystickButton(m_driverController, OIConstants.kGoToAprilTag10Button)
+        .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision, 10));
   }
 
   /**

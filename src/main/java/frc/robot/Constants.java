@@ -4,6 +4,8 @@
 
 package frc.robot;
 
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
@@ -79,6 +81,25 @@ public final class Constants {
   public static final class OIConstants {
     public static final int kDriverControllerPort = 0;
     public static final double kDriveDeadband = 0.05;
+    /** Button for "go to AprilTag 9" (teleop): positions robot centered in front of tag 9. */
+    public static final int kGoToAprilTag9Button = 1; // Xbox A
+    /** Button for "go to AprilTag 10" (teleop): positions robot centered in front of tag 10. */
+    public static final int kGoToAprilTag10Button = 2; // Xbox B
+  }
+
+  /** Limelight / AprilTag: targeting and go-to-tag. */
+  public static final class VisionConstants {
+    /** Max time (seconds) for GoToAprilTagCommand; then command ends (safety). */
+    public static final double kGoToAprilTagTimeoutSeconds = 5.0;
+    /** If tag not seen within this time (s), command ends (no tag). */
+    public static final double kGoToAprilTagAcquireTimeoutSeconds = 1.0;
+    /** Default distance (m) in front of AprilTag when using go-to-tag. */
+    public static final double kDefaultDistanceFromTagMeters = 1.5;
+    /** AprilTag layout (field pose of each tag). Update from game manual for your year. */
+    public static final Pose2d kTag9FieldPose = new Pose2d(2.0, 2.0, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag10FieldPose = new Pose2d(2.0, -2.0, Rotation2d.fromDegrees(0));
+    /** Limelight NetworkTable name. */
+    public static final String kLimelightTableName = "limelight";
   }
 
   public static final class AutoConstants {
