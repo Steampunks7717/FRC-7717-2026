@@ -85,9 +85,9 @@ public class RobotContainer {
             m_robotDrive));
 
     // Teleop: one button = position robot centered in front of AprilTag (fast, with timeout)
-    new JoystickButton(m_driverController, OIConstants.kGoToAprilTag9Button)
+    new JoystickButton(m_driverController, XboxController.Button.kA.value)
         .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision, 9));
-    new JoystickButton(m_driverController, OIConstants.kGoToAprilTag10Button)
+    new JoystickButton(m_driverController,  XboxController.Button.kB.value)
         .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision, 10));
   }
 
