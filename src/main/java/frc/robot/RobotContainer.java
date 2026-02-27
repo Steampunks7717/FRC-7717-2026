@@ -7,7 +7,6 @@ package frc.robot;
 import edu.wpi.first.math.MathUtil;
 import com.pathplanner.lib.auto.AutoBuilder;
 import edu.wpi.first.wpilibj.XboxController;
-import edu.wpi.first.wpilibj.PS4Controller.Button;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants.OIConstants;
@@ -20,7 +19,6 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
-import edu.wpi.first.wpilibj2.command.button.Trigger;
 
 /*
  * This class is where the bulk of the robot should be declared.  Since Command-based is a
@@ -31,7 +29,7 @@ import edu.wpi.first.wpilibj2.command.button.Trigger;
 public class RobotContainer {
   // The robot's subsystems
   private final DriveSubsystem m_robotDrive = new DriveSubsystem();
-  private final VisionSubsystem m_vision = new VisionSubsystem();
+  private final VisionSubsystem m_vision = new VisionSubsystem(m_robotDrive);
 
   private final Shooter m_shooter = new Shooter();
   private final Intake m_intake = new Intake();
@@ -81,7 +79,7 @@ public class RobotContainer {
    * {@link JoystickButton}.
    */
   private void configureButtonBindings() {
-    new JoystickButton(m_driverController, Button.kR1.value)
+    new JoystickButton(m_driverController, XboxController.Button.kRightBumper.value)
         .whileTrue(new RunCommand(
             () -> m_robotDrive.setX(),
             m_robotDrive));
@@ -96,8 +94,10 @@ public class RobotContainer {
         .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision, 9));
     new JoystickButton(m_driverController,  XboxController.Button.kB.value)
         .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision, 10));
-    new JoystickButton(m_driverController, XboxController.Button.kX.value).onTrue(new RunCommand(() -> m_shooter.shoot(), m_shooter)).onFalse(new RunCommand(() -> m_shooter.shooterStop(), m_shooter));
-    new JoystickButton(m_driverController, XboxController.Button.kA.value).onTrue(new RunCommand(() -> m_intake.intake1(), m_intake)).onFalse(new RunCommand(() -> m_intake.intakeStop(), m_intake));
+    new JoystickButton(m_driverController, XboxController.Button.kX.value)
+        .whileTrue(new RunCommand(() -> m_shooter.shoot(), m_shooter));
+    new JoystickButton(m_driverController, XboxController.Button.kY.value)
+        .whileTrue(new RunCommand(() -> m_intake.intake1(), m_intake));
 
   }
      

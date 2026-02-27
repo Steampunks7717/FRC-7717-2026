@@ -11,7 +11,7 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
-import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
+import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.networktables.NetworkTableInstance;
@@ -54,8 +54,8 @@ public class DriveSubsystem extends SubsystemBase {
   // The gyro sensor
   private final ADIS16470_IMU m_gyro = new ADIS16470_IMU();
 
-  // Odometry class for tracking robot pose
-  SwerveDriveOdometry m_odometry = new SwerveDriveOdometry(
+  // Pose estimator: fuses wheel odometry + vision measurements from Limelight
+  private final SwerveDrivePoseEstimator m_poseEstimator = new SwerveDrivePoseEstimator(
       DriveConstants.kDriveKinematics,
       Rotation2d.fromDegrees(m_gyro.getAngle(IMUAxis.kZ)),
       new SwerveModulePosition[] {
@@ -63,7 +63,8 @@ public class DriveSubsystem extends SubsystemBase {
           m_frontRight.getPosition(),
           m_rearLeft.getPosition(),
           m_rearRight.getPosition()
-      });
+      },
+      new Pose2d());
 
   /** Publisher for Advantage Scope: swerve module states (topic /SwerveStates). */
   private final StructArrayPublisher<SwerveModuleState> m_swerveStatesPublisher =
@@ -101,8 +102,8 @@ public class DriveSubsystem extends SubsystemBase {
           this::getRobotRelativeSpeeds,
           this::driveRobotRelative,
           new PPHolonomicDriveController(
-              new PIDConstants(5.0, 0.0, 0.0),
-              new PIDConstants(5.0, 0.0, 0.0)),
+              new PIDConstants(1.0, 0.0, 0.0),   // translation XY — subir si llega corto, bajar si oscila
+              new PIDConstants(3.0, 0.0, 0.0)),   // rotation     — subir si gira lento, bajar si vibra
           config,
           () -> {
             var alliance = DriverStation.getAlliance();
@@ -134,8 +135,8 @@ public class DriveSubsystem extends SubsystemBase {
       double newY = m_simPose.getY() + (vx * Math.sin(theta) + vy * Math.cos(theta)) * dt;
       m_simPose = new Pose2d(newX, newY, new Rotation2d(theta + omega * dt));
     } else {
-      // Real robot: update odometry from gyro and module positions
-      m_odometry.update(
+      // Real robot: update pose estimator from gyro and module positions
+      m_poseEstimator.update(
           Rotation2d.fromDegrees(m_gyro.getAngle(IMUAxis.kZ)),
           new SwerveModulePosition[] {
               m_frontLeft.getPosition(),
@@ -165,7 +166,7 @@ public class DriveSubsystem extends SubsystemBase {
     if (useIntegratedPose()) {
       return m_simPose;
     }
-    return m_odometry.getPoseMeters();
+    return m_poseEstimator.getEstimatedPosition();
   }
 
   /**
@@ -205,7 +206,7 @@ public class DriveSubsystem extends SubsystemBase {
     if (useIntegratedPose()) {
       m_simPose = pose;
     } else {
-      m_odometry.resetPosition(
+      m_poseEstimator.resetPosition(
           Rotation2d.fromDegrees(m_gyro.getAngle(IMUAxis.kZ)),
           new SwerveModulePosition[] {
               m_frontLeft.getPosition(),
@@ -214,6 +215,19 @@ public class DriveSubsystem extends SubsystemBase {
               m_rearRight.getPosition()
           },
           pose);
+    }
+  }
+
+  /**
+   * Incorporates a vision-based pose measurement into the pose estimator.
+   * Called by VisionSubsystem every cycle a valid Limelight botpose is available.
+   *
+   * @param visionPose       Robot pose as computed by the Limelight (field-relative, WPIBlue).
+   * @param timestampSeconds FPGA timestamp of the image capture (already latency-compensated).
+   */
+  public void addVisionMeasurement(Pose2d visionPose, double timestampSeconds) {
+    if (!useIntegratedPose()) {
+      m_poseEstimator.addVisionMeasurement(visionPose, timestampSeconds);
     }
   }
 

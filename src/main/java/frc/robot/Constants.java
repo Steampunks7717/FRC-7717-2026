@@ -25,10 +25,9 @@ import edu.wpi.first.math.util.Units;
  */
 public final class Constants {
   public static final class DriveConstants {
-    // Driving Parameters - Note that these are not the maximum capable speeds of
-    // the robot, rather the allowed maximum speeds
-    public static final double kMaxSpeedMetersPerSecond = 1;
-    public static final double kMaxAngularSpeed = 1 * Math.PI; // radians per second
+    // Driving Parameters - matched to PathPlanner settings.json (maxDriveSpeed=3, defaultMaxAngVel=540 deg/s)
+    public static final double kMaxSpeedMetersPerSecond = 3;       // m/s
+    public static final double kMaxAngularSpeed = 3 * Math.PI;    // rad/s (~540 deg/s)
 
     // Chassis configuration
     public static final double kTrackWidth = Units.inchesToMeters(24.5);
@@ -95,18 +94,23 @@ public final class Constants {
     public static final double kGoToAprilTagAcquireTimeoutSeconds = 1.0;
     /** Default distance (m) in front of AprilTag when using go-to-tag. */
     public static final double kDefaultDistanceFromTagMeters = 1.5;
-    /** AprilTag layout (field pose of each tag). Update from game manual for your year. */
-    public static final Pose2d kTag9FieldPose = new Pose2d(2.0, 2.0, Rotation2d.fromDegrees(0));
-    public static final Pose2d kTag10FieldPose = new Pose2d(2.0, -2.0, Rotation2d.fromDegrees(0));
+    /**
+     * AprilTag field poses from the official 2026-rebuilt-welded.json layout (WPIBlue frame).
+     * Tags 9 and 10 are on the Red Reef structure, facing 0° (toward +X / Red wall).
+     * Source: wpilibsuite/allwpilib 2026-rebuilt-welded.json
+     */
+    public static final Pose2d kTag9FieldPose  = new Pose2d(12.519177, 3.6790376, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag10FieldPose = new Pose2d(12.519177, 4.0346376, Rotation2d.fromDegrees(0));
     /** Limelight NetworkTable name. */
     public static final String kLimelightTableName = "limelight";
   }
 
   public static final class AutoConstants {
-    public static final double kMaxSpeedMetersPerSecond = 1;
-    public static final double kMaxAccelerationMetersPerSecondSquared = 1;
-    public static final double kMaxAngularSpeedRadiansPerSecond = Math.PI;
-    public static final double kMaxAngularSpeedRadiansPerSecondSquared = Math.PI;
+    // Matched to PathPlanner settings.json (defaultMaxVel=3, defaultMaxAccel=3, defaultMaxAngVel=540, defaultMaxAngAccel=720)
+    public static final double kMaxSpeedMetersPerSecond = 3;
+    public static final double kMaxAccelerationMetersPerSecondSquared = 3;
+    public static final double kMaxAngularSpeedRadiansPerSecond = 3 * Math.PI;     // rad/s (~540 deg/s)
+    public static final double kMaxAngularSpeedRadiansPerSecondSquared = 4 * Math.PI; // rad/s^2 (~720 deg/s^2)
 
     public static final double kPXController = 1;
     public static final double kPYController = 1;
