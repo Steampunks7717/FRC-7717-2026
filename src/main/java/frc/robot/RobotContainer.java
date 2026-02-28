@@ -7,6 +7,7 @@ package frc.robot;
 import edu.wpi.first.math.MathUtil;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -21,6 +22,7 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
+import java.util.Optional;
 
 /*
  * This class is where the bulk of the robot should be declared.  Since Command-based is a
@@ -40,8 +42,8 @@ public class RobotContainer {
   // The driver's controller
   XboxController m_driverController = new XboxController(OIConstants.kDriverControllerPort);
 
-  /** PathPlanner auto chooser; null when PathPlanner config is not present. */
-  private final SendableChooser<Command> m_pathPlannerChooser;
+  /** Starting position chooser (1, 2, or 3). Alliance is read from DriverStation automatically. */
+  private final SendableChooser<Integer> m_positionChooser = new SendableChooser<>();
 
   /**
    * The container for the robot. Contains subsystems, OI devices, and commands.
@@ -53,13 +55,12 @@ public class RobotContainer {
             .withTimeout(10)
             .andThen(new InstantCommand(() -> m_shooter.shooterStop(), m_shooter)));
 
-    // PathPlanner: build chooser when AutoBuilder was configured (has RobotConfig from GUI)
-    if (AutoBuilder.isConfigured()) {
-      m_pathPlannerChooser = AutoBuilder.buildAutoChooser("auto1");
-      SmartDashboard.putData("Auto Chooser", m_pathPlannerChooser);
-    } else {
-      m_pathPlannerChooser = null;
-    }
+    // Starting position chooser: driver selects 1, 2, or 3 on SmartDashboard.
+    // Alliance (Red/Blue) is read automatically from the DriverStation at match start.
+    m_positionChooser.setDefaultOption("Posicion 1", 1);
+    m_positionChooser.addOption("Posicion 2", 2);
+    m_positionChooser.addOption("Posicion 3", 3);
+    SmartDashboard.putData("Posicion Inicio", m_positionChooser);
 
     // Configure the button bindings
     configureButtonBindings();
@@ -111,17 +112,36 @@ public class RobotContainer {
      
 
   /**
-   * Use this to pass the autonomous command to the main {@link Robot} class.
-   * When PathPlanner is configured, returns the selected auto from the chooser.
-   * Otherwise returns a no-op command (only PathPlanner autos are run).
+   * Builds the autonomous command based on:
+   *  - Alliance: read automatically from DriverStation (set by field/DS).
+   *  - Starting position: chosen by the driver on SmartDashboard (1, 2, or 3).
    *
-   * @return the command to run in autonomous
+   * Auto file must exist in deploy/pathplanner/autos/ with the matching name,
+   * e.g. "Blue1.auto", "Red2.auto", "Blue3.auto".
    */
   public Command getAutonomousCommand() {
-    if (m_pathPlannerChooser != null) {
-      return m_pathPlannerChooser.getSelected();
+    if (!AutoBuilder.isConfigured()) {
+      System.out.println("[Auto] PathPlanner no configurado. Sin auto.");
+      return new InstantCommand();
     }
-    return new InstantCommand();
+
+    Optional<DriverStation.Alliance> alliance = DriverStation.getAlliance();
+    String allianceName = (alliance.isPresent() && alliance.get() == DriverStation.Alliance.Red)
+        ? "Red" : "Blue";
+    int position = m_positionChooser.getSelected();
+    String autoName = allianceName + position; // e.g. "Blue2", "Red3"
+
+    System.out.println("[Auto] Alianza=" + allianceName + " | Posicion=" + position
+        + " | Cargando auto: " + autoName);
+    SmartDashboard.putString("Auto/Seleccionado", autoName);
+
+    try {
+      return AutoBuilder.buildAuto(autoName);
+    } catch (Exception e) {
+      System.out.println("[Auto] Auto '" + autoName + "' no encontrado en PathPlanner. Sin auto.");
+      SmartDashboard.putString("Auto/Seleccionado", autoName + " - NO ENCONTRADO");
+      return new InstantCommand();
+    }
   }
 
 }
