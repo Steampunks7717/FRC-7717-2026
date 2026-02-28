@@ -6,6 +6,7 @@ package frc.robot;
 
 import edu.wpi.first.math.MathUtil;
 import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.auto.NamedCommands;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -16,6 +17,7 @@ import frc.robot.subsystems.Intake;
 import frc.robot.subsystems.Shooter;
 import frc.robot.subsystems.VisionSubsystem;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
@@ -45,6 +47,12 @@ public class RobotContainer {
    * The container for the robot. Contains subsystems, OI devices, and commands.
    */
   public RobotContainer() {
+    // Named commands must be registered BEFORE buildAutoChooser so PathPlanner can find them.
+    NamedCommands.registerCommand("Shoot",
+        Commands.run(() -> m_shooter.shoot(), m_shooter)
+            .withTimeout(10)
+            .andThen(new InstantCommand(() -> m_shooter.shooterStop(), m_shooter)));
+
     // PathPlanner: build chooser when AutoBuilder was configured (has RobotConfig from GUI)
     if (AutoBuilder.isConfigured()) {
       m_pathPlannerChooser = AutoBuilder.buildAutoChooser("auto1");

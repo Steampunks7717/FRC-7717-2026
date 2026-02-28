@@ -9,6 +9,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.VisionConstants;
 
@@ -44,12 +45,26 @@ public class VisionSubsystem extends SubsystemBase {
     double[] botpose = m_limelight.getEntry("botpose_orb_wpiblue")
         .getDoubleArray(new double[0]);
 
+    boolean targetSeen = hasTarget();
+    int targetId = getTargetId();
+
+    // ── SmartDashboard logging ────────────────────────────────────────────────
+    SmartDashboard.putBoolean("Vision/HasTarget", targetSeen);
+    SmartDashboard.putNumber("Vision/TargetId", targetId);
+    SmartDashboard.putNumber("Vision/tx", getTx());
+    SmartDashboard.putNumber("Vision/ty", getTy());
+
     // Step 3: fuse into pose estimator only when a valid target is seen
-    if (hasTarget() && botpose.length >= 7) {
+    if (targetSeen && botpose.length >= 7) {
       double latencyMs  = botpose[6];
       Pose2d visionPose = new Pose2d(botpose[0], botpose[1],
           Rotation2d.fromDegrees(botpose[5]));
       double timestamp  = Timer.getFPGATimestamp() - (latencyMs / 1000.0);
+
+      SmartDashboard.putNumber("Vision/BotPose_X", visionPose.getX());
+      SmartDashboard.putNumber("Vision/BotPose_Y", visionPose.getY());
+      SmartDashboard.putNumber("Vision/BotPose_Yaw", visionPose.getRotation().getDegrees());
+
       m_drive.addVisionMeasurement(visionPose, timestamp);
     }
   }
