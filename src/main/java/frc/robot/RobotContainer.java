@@ -138,9 +138,16 @@ public class RobotContainer {
     try {
       return AutoBuilder.buildAuto(autoName);
     } catch (Exception e) {
-      System.out.println("[Auto] Auto '" + autoName + "' no encontrado en PathPlanner. Sin auto.");
-      SmartDashboard.putString("Auto/Seleccionado", autoName + " - NO ENCONTRADO");
-      return new InstantCommand();
+      // Alliance+position auto not found — fall back to "auto1" (default test auto)
+      System.out.println("[Auto] Auto '" + autoName + "' no encontrado. Usando 'auto1' como respaldo.");
+      SmartDashboard.putString("Auto/Seleccionado", autoName + " -> auto1 (respaldo)");
+      try {
+        return AutoBuilder.buildAuto("auto1");
+      } catch (Exception e2) {
+        System.out.println("[Auto] 'auto1' tampoco encontrado. Sin auto.");
+        SmartDashboard.putString("Auto/Seleccionado", "NINGUNO");
+        return new InstantCommand();
+      }
     }
   }
 
