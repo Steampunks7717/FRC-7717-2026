@@ -49,6 +49,15 @@ public class VisionSubsystem extends SubsystemBase {
     int targetId = getTargetId();
 
     // ── SmartDashboard logging ────────────────────────────────────────────────
+    // Raw values — use these to diagnose NetworkTable connection issues
+    double rawTv  = m_limelight.getEntry("tv").getDouble(-999);
+    double rawTid = m_limelight.getEntry("tid").getDouble(-999);
+    SmartDashboard.putNumber("Vision/RAW_tv",  rawTv);   // should be 0.0 or 1.0; if -999 = NT no conectada
+    SmartDashboard.putNumber("Vision/RAW_tid", rawTid);  // should be tag ID; if -999 = NT no conectada
+    SmartDashboard.putString("Vision/TableName", VisionConstants.kLimelightTableName);
+    SmartDashboard.putBoolean("Vision/NT_Connected",
+        NetworkTableInstance.getDefault().isConnected());
+
     SmartDashboard.putBoolean("Vision/HasTarget", targetSeen);
     SmartDashboard.putNumber("Vision/TargetId", targetId);
     SmartDashboard.putNumber("Vision/tx", getTx());
@@ -94,6 +103,15 @@ public class VisionSubsystem extends SubsystemBase {
   /** True if the current primary target is the given tag ID. */
   public boolean isSeeingTag(int tagId) {
     return hasTarget() && getTargetId() == tagId;
+  }
+
+  /**
+   * 3D pose of the primary target in robot space (robot-relative, meters + degrees).
+   * Array: [x, y, z, rx, ry, rz] — z is the forward distance to the tag.
+   * Returns empty array if no target or Limelight not connected.
+   */
+  public double[] getTargetPoseRobotSpace() {
+    return m_limelight.getEntry("targetpose_robotspace").getDoubleArray(new double[0]);
   }
 
   // ── Pose helpers for navigation ───────────────────────────────────────────

@@ -79,7 +79,7 @@ public final class Constants {
 
   public static final class OIConstants {
     public static final int kDriverControllerPort = 0;
-    public static final double kDriveDeadband = 0.05;
+    public static final double kDriveDeadband = 0.08;
     /** Button for "go to AprilTag 9" (teleop): positions robot centered in front of tag 9. */
     public static final int kGoToAprilTag9Button = 1; // Xbox A
     /** Button for "go to AprilTag 10" (teleop): positions robot centered in front of tag 10. */

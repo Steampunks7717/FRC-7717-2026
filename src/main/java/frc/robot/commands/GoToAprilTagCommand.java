@@ -4,112 +4,177 @@
 
 package frc.robot.commands;
 
-import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.path.PathConstraints;
-import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
-import frc.robot.Constants.AutoConstants;
+import frc.robot.TagGroups;
+import frc.robot.TagGroups.TagGroup;
 import frc.robot.Constants.VisionConstants;
 import frc.robot.subsystems.DriveSubsystem;
 import frc.robot.subsystems.VisionSubsystem;
 
 /**
- * Teleop: navigates the robot to a pose centered in front of a given AprilTag.
+ * Teleop: navega el robot frente a un AprilTag usando SOLO la camara (Limelight).
  *
- * Uses PathPlanner's pathfindToPose() so the swerve properly decouples
- * translation from heading and avoids obstacles using the navgrid.
+ * Dos modos de uso:
+ *  1. Auto-detect: new GoToAprilTagCommand(drive, vision)
+ *     → Lee el tag que la camara ve en ese momento, busca su grupo en TagGroups,
+ *       y usa la distancia configurada para ese grupo.
+ *  2. Tag fijo:   new GoToAprilTagCommand(drive, vision, tagId)
+ *     → Va directamente a ese tag con la distancia por defecto.
  *
- * If the tag is not in the known layout (null pose), the command ends immediately.
+ * No depende del gyro ni de PathPlanner. Control proporcional directo con camara.
  */
 public class GoToAprilTagCommand extends Command {
-  private final DriveSubsystem m_drive;
+
+  // Ganancias proporcionales — subir si llega lento, bajar si oscila
+  private static final double kP_Distance = 0.6;  // (m/s) por metro de error
+  private static final double kP_Rotation = 0.04; // (rad/s) por grado de tx
+
+  // Limites de velocidad
+  private static final double kMaxForwardSpeed = 1.2; // m/s
+  private static final double kMaxRotSpeed     = 1.5; // rad/s
+
+  // Tolerancias para declarar "llegue"
+  private static final double kDistanceTolerance = 0.1; // metros
+  private static final double kTxTolerance       = 2.0; // grados
+
+  private final DriveSubsystem  m_drive;
   private final VisionSubsystem m_vision;
-  private final int m_tagId;
-  private final double m_distanceMeters;
+  private final int             m_requestedTagId;    // -1 = auto-detect
+  private final double          m_requestedDistance; // 0 = usar el grupo
 
-  /** Inner PathPlanner pathfind command, built on initialize(). Null if tag unknown. */
-  private Command m_pathfindCommand = null;
+  // Resueltos en initialize()
+  private int    m_resolvedTagId;
+  private double m_resolvedDistance;
 
+  private final Timer m_timer = new Timer();
+
+  /**
+   * Modo AUTO-DETECT: lee el tag visible en ese momento, determina su grupo
+   * (de TagGroups), y usa la distancia configurada para ese grupo.
+   */
+  public GoToAprilTagCommand(DriveSubsystem drive, VisionSubsystem vision) {
+    this(drive, vision, -1, 0);
+  }
+
+  /**
+   * Modo tag fijo con distancia por defecto (kDefaultDistanceFromTagMeters).
+   */
   public GoToAprilTagCommand(DriveSubsystem drive, VisionSubsystem vision, int tagId) {
     this(drive, vision, tagId, VisionConstants.kDefaultDistanceFromTagMeters);
   }
 
+  /**
+   * Modo tag fijo con distancia especificada.
+   */
   public GoToAprilTagCommand(DriveSubsystem drive, VisionSubsystem vision, int tagId,
       double distanceMeters) {
-    m_drive = drive;
-    m_vision = vision;
-    m_tagId = tagId;
-    m_distanceMeters = distanceMeters;
+    m_drive           = drive;
+    m_vision          = vision;
+    m_requestedTagId  = tagId;
+    m_requestedDistance = distanceMeters;
     addRequirements(drive);
   }
 
   @Override
   public void initialize() {
-    m_pathfindCommand = null;
+    m_timer.reset();
+    m_timer.start();
+    m_resolvedTagId   = -1;
+    m_resolvedDistance = 0;
 
-    int seenId = m_vision.getTargetId();
-    boolean cameraSeesTag = m_vision.isSeeingTag(m_tagId);
-    System.out.println("[GoToAprilTag] Comando iniciado para tag " + m_tagId
-        + " | Camara ve: " + m_vision.hasTarget()
-        + " | Tag que ve ahora: " + seenId
-        + " | Ve el tag correcto: " + cameraSeesTag);
+    if (m_requestedTagId == -1) {
+      // Modo auto-detect: leer tag de camara y buscar su grupo
+      int seenId = m_vision.getTargetId();
+      TagGroup group = (seenId >= 0) ? TagGroups.getGroup(seenId) : null;
 
-    SmartDashboard.putNumber("GoToTag/TargetTagId", m_tagId);
-    SmartDashboard.putBoolean("GoToTag/CameraSeesTarget", cameraSeesTag);
-    SmartDashboard.putNumber("GoToTag/CameraSeenId", seenId);
+      if (seenId < 0 || group == null) {
+        String reason = seenId < 0 ? "SIN_TAG" : "TAG_" + seenId + "_SIN_GRUPO";
+        SmartDashboard.putString("GoToTag/Status", reason);
+        System.out.println("[GoToAprilTag] Auto-detect: " + reason + ". Comando abortado.");
+        return;
+      }
 
-    Pose2d currentPose = m_drive.getPose();
-    System.out.println("[GoToAprilTag] Pose actual del robot: X=" + currentPose.getX()
-        + " Y=" + currentPose.getY()
-        + " Yaw=" + currentPose.getRotation().getDegrees() + "deg");
+      m_resolvedTagId   = seenId;
+      m_resolvedDistance = group.distanceMeters;
+      SmartDashboard.putString("GoToTag/Grupo", group.name);
+      System.out.println("[GoToAprilTag] Auto-detect: tag=" + seenId
+          + " grupo='" + group.name + "' dist=" + group.distanceMeters + "m");
 
-    Pose2d target = m_vision.getTargetPoseInFrontOfTag(m_tagId, m_distanceMeters);
-    if (target == null) {
-      System.out.println("[GoToAprilTag] Tag " + m_tagId + " NO esta en el layout. Comando terminado.");
-      SmartDashboard.putString("GoToTag/Status", "TAG_NOT_IN_LAYOUT");
-      return;
+    } else {
+      // Modo tag fijo
+      m_resolvedTagId   = m_requestedTagId;
+      m_resolvedDistance = m_requestedDistance;
+      System.out.println("[GoToAprilTag] Tag fijo: " + m_resolvedTagId
+          + " dist=" + m_resolvedDistance + "m");
     }
 
-    System.out.println("[GoToAprilTag] Destino calculado: X=" + target.getX()
-        + " Y=" + target.getY()
-        + " Yaw=" + target.getRotation().getDegrees() + "deg");
-    SmartDashboard.putNumber("GoToTag/TargetPose_X", target.getX());
-    SmartDashboard.putNumber("GoToTag/TargetPose_Y", target.getY());
-    SmartDashboard.putNumber("GoToTag/TargetPose_Yaw", target.getRotation().getDegrees());
-    SmartDashboard.putString("GoToTag/Status", "NAVEGANDO");
-
-    PathConstraints constraints = new PathConstraints(
-        AutoConstants.kMaxSpeedMetersPerSecond,
-        AutoConstants.kMaxAccelerationMetersPerSecondSquared,
-        AutoConstants.kMaxAngularSpeedRadiansPerSecond,
-        AutoConstants.kMaxAngularSpeedRadiansPerSecondSquared);
-
-    m_pathfindCommand = AutoBuilder.pathfindToPose(target, constraints);
-    m_pathfindCommand.initialize();
+    SmartDashboard.putNumber("GoToTag/TagId",    m_resolvedTagId);
+    SmartDashboard.putNumber("GoToTag/DistObj",  m_resolvedDistance);
+    SmartDashboard.putString("GoToTag/Status",   "BUSCANDO");
   }
 
   @Override
   public void execute() {
-    if (m_pathfindCommand != null) {
-      m_pathfindCommand.execute();
+    if (m_resolvedTagId < 0) return; // no se resolvio en initialize, ya terminara
+
+    if (!m_vision.isSeeingTag(m_resolvedTagId)) {
+      m_drive.driveRobotRelative(new ChassisSpeeds());
+      SmartDashboard.putString("GoToTag/Status", "TAG_PERDIDO");
+      return;
     }
+
+    // Distancia real al tag (Z de targetpose_robotspace, metros)
+    double[] targetPose = m_vision.getTargetPoseRobotSpace();
+    double distance = (targetPose.length >= 3) ? Math.abs(targetPose[2]) : 0;
+
+    // Error de angulo horizontal: positivo = tag a la derecha
+    double tx = m_vision.getTx();
+
+    // Control proporcional
+    double xSpeed = kP_Distance * (distance - m_resolvedDistance);
+    double omega  = -kP_Rotation * tx;
+
+    // Limitar velocidades
+    xSpeed = MathUtil.clamp(xSpeed, -kMaxForwardSpeed, kMaxForwardSpeed);
+    omega  = MathUtil.clamp(omega,  -kMaxRotSpeed,     kMaxRotSpeed);
+
+    m_drive.driveRobotRelative(new ChassisSpeeds(xSpeed, 0, omega));
+
+    SmartDashboard.putNumber("GoToTag/Dist_m",    distance);
+    SmartDashboard.putNumber("GoToTag/DistErr_m", distance - m_resolvedDistance);
+    SmartDashboard.putNumber("GoToTag/tx_deg",    tx);
+    SmartDashboard.putString("GoToTag/Status",    "NAVEGANDO");
   }
 
   @Override
   public boolean isFinished() {
-    if (m_pathfindCommand == null) return true;
-    return m_pathfindCommand.isFinished();
+    // No se resolvio ningun tag: terminar inmediatamente
+    if (m_resolvedTagId < 0) return true;
+
+    // Timeout de seguridad
+    if (m_timer.get() > VisionConstants.kGoToAprilTagTimeoutSeconds) return true;
+
+    // Verificar si llegamos
+    if (!m_vision.isSeeingTag(m_resolvedTagId)) return false;
+    double[] targetPose = m_vision.getTargetPoseRobotSpace();
+    double distance = (targetPose.length >= 3) ? Math.abs(targetPose[2]) : 0;
+
+    boolean atDistance = Math.abs(distance - m_resolvedDistance) < kDistanceTolerance;
+    boolean centered   = Math.abs(m_vision.getTx()) < kTxTolerance;
+    return atDistance && centered;
   }
 
   @Override
   public void end(boolean interrupted) {
-    if (m_pathfindCommand != null) {
-      m_pathfindCommand.end(interrupted);
-    }
     m_drive.driveRobotRelative(new ChassisSpeeds());
-    SmartDashboard.putString("GoToTag/Status", interrupted ? "INTERRUMPIDO" : "COMPLETADO");
-    System.out.println("[GoToAprilTag] Comando terminado. Interrumpido: " + interrupted);
+    m_timer.stop();
+    String status = interrupted ? "INTERRUMPIDO" : "COMPLETADO";
+    SmartDashboard.putString("GoToTag/Status", status);
+    System.out.println("[GoToAprilTag] " + status
+        + " | tag=" + m_resolvedTagId + " | tiempo=" + m_timer.get() + "s");
   }
 }

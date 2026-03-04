@@ -26,6 +26,7 @@ import edu.wpi.first.wpilibj.SPI;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants.DriveConstants;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
@@ -92,6 +93,10 @@ public class DriveSubsystem extends SubsystemBase {
     // Usage reporting for MAXSwerve template
     HAL.report(tResourceType.kResourceType_RobotDrive, tInstances.kRobotDriveSwerve_MaxSwerve);
 
+    // Calibrate gyro — robot MUST be stationary for ~5 seconds after power-on.
+    // This zeros the internal bias so getAngle() starts at 0.
+    m_gyro.calibrate();
+
     // PathPlanner AutoBuilder: load robot config from GUI and configure path following.
     // If no config file exists (e.g. first run), autonomous will use WPILib fallback in RobotContainer.
     try {
@@ -155,6 +160,10 @@ public class DriveSubsystem extends SubsystemBase {
         });
     // Publish pose for Advantage Scope (2D Field / 3D Field tab)
     m_posePublisher.set(getPose());
+    // Gyro diagnostics — usar para verificar signo y calibracion
+    SmartDashboard.putNumber("Gyro/RawAngle",   m_gyro.getAngle());
+    SmartDashboard.putNumber("Gyro/Heading",    getHeading());
+    SmartDashboard.putNumber("Gyro/RateDegs",   m_gyro.getRate());
   }
 
   /**

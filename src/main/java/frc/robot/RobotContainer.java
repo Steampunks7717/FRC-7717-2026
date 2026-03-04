@@ -5,6 +5,7 @@
 package frc.robot;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.filter.SlewRateLimiter;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -42,6 +43,12 @@ public class RobotContainer {
   // The driver's controller
   XboxController m_driverController = new XboxController(OIConstants.kDriverControllerPort);
 
+  // Slew rate limiters: suavizan la aceleracion del joystick para evitar movimientos bruscos.
+  // El valor (ej. 2.5) = unidades por segundo; 2.5 → llega a full stick en ~0.4 segundos.
+  private final SlewRateLimiter m_xLimiter   = new SlewRateLimiter(2.5);
+  private final SlewRateLimiter m_yLimiter   = new SlewRateLimiter(2.5);
+  private final SlewRateLimiter m_rotLimiter = new SlewRateLimiter(2.0);
+
   /** Starting position chooser (1, 2, or 3). Alliance is read from DriverStation automatically. */
   private final SendableChooser<Integer> m_positionChooser = new SendableChooser<>();
 
@@ -71,9 +78,9 @@ public class RobotContainer {
         // Turning is controlled by the X axis of the right stick.
         new RunCommand(
             () -> m_robotDrive.drive(
-                -MathUtil.applyDeadband(m_driverController.getLeftY(), OIConstants.kDriveDeadband),
-                -MathUtil.applyDeadband(m_driverController.getLeftX(), OIConstants.kDriveDeadband),
-                -MathUtil.applyDeadband(m_driverController.getRightX(), OIConstants.kDriveDeadband),
+                m_xLimiter.calculate(-MathUtil.applyDeadband(m_driverController.getLeftY(), OIConstants.kDriveDeadband)),
+                m_yLimiter.calculate(-MathUtil.applyDeadband(m_driverController.getLeftX(), OIConstants.kDriveDeadband)),
+                m_rotLimiter.calculate(-MathUtil.applyDeadband(m_driverController.getRightX(), OIConstants.kDriveDeadband)),
                 true),
             m_robotDrive));
   }
@@ -98,11 +105,12 @@ public class RobotContainer {
             () -> m_robotDrive.zeroHeading(),
             m_robotDrive));
 
-    // Teleop: one button = position robot centered in front of AprilTag (fast, with timeout)
+    // Teleop: A = auto-detect (lee el tag visible, busca su grupo, va a la distancia correcta).
+    // Si la camara no ve ningun tag o el tag no esta en TagGroups, el comando aborta sin moverse.
     new JoystickButton(m_driverController, XboxController.Button.kA.value)
-        .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision, 9));
+        .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision));
     new JoystickButton(m_driverController,  XboxController.Button.kB.value)
-        .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision, 10));
+        .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision));
     new JoystickButton(m_driverController, XboxController.Button.kX.value)
         .whileTrue(new RunCommand(() -> m_shooter.shoot(), m_shooter));
     new JoystickButton(m_driverController, XboxController.Button.kY.value)
