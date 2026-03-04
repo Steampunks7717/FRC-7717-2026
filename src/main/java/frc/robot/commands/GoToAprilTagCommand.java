@@ -30,16 +30,19 @@ import frc.robot.subsystems.VisionSubsystem;
 public class GoToAprilTagCommand extends Command {
 
   // Ganancias proporcionales — subir si llega lento, bajar si oscila
-  private static final double kP_Distance = 0.6;  // (m/s) por metro de error
+  private static final double kP_Distance = 0.6;  // (m/s) por metro de error de distancia
+  private static final double kP_Lateral  = 0.4;  // (m/s) por metro de desviacion lateral
   private static final double kP_Rotation = 0.04; // (rad/s) por grado de tx
 
   // Limites de velocidad
-  private static final double kMaxForwardSpeed = 1.2; // m/s
+  private static final double kMaxForwardSpeed = 1.2; // m/s adelante/atras
+  private static final double kMaxStrafeSpeed  = 0.8; // m/s lateral
   private static final double kMaxRotSpeed     = 1.5; // rad/s
 
   // Tolerancias para declarar "llegue"
-  private static final double kDistanceTolerance = 0.1; // metros
-  private static final double kTxTolerance       = 2.0; // grados
+  private static final double kDistanceTolerance = 0.1; // metros adelante/atras
+  private static final double kLateralTolerance  = 0.08; // metros izquierda/derecha
+  private static final double kTxTolerance       = 2.0;  // grados
 
   private final DriveSubsystem  m_drive;
   private final VisionSubsystem m_vision;
@@ -127,27 +130,34 @@ public class GoToAprilTagCommand extends Command {
       return;
     }
 
-    // Distancia real al tag (Z de targetpose_robotspace, metros)
+    // Leer los 3 ejes de targetpose_robotspace (metros)
+    // [0]=lateral (X), [1]=vertical (Y), [2]=profundidad/distancia (Z)
     double[] targetPose = m_vision.getTargetPoseRobotSpace();
-    double distance = (targetPose.length >= 3) ? Math.abs(targetPose[2]) : 0;
+    double distance      = (targetPose.length >= 3) ? Math.abs(targetPose[2]) : 0;
+    double lateralOffset = (targetPose.length >= 1) ? targetPose[0] : 0;
+    // lateralOffset > 0 → tag a la derecha del robot → strafear derecha (vy negativo en WPILib)
+    // Si el robot va al lado contrario, invertir el signo: cambiar -kP_Lateral por +kP_Lateral
 
     // Error de angulo horizontal: positivo = tag a la derecha
     double tx = m_vision.getTx();
 
-    // Control proporcional
-    double xSpeed = kP_Distance * (distance - m_resolvedDistance);
-    double omega  = -kP_Rotation * tx;
+    // Control proporcional en los 3 ejes
+    double xSpeed = kP_Distance * (distance - m_resolvedDistance); // adelante/atras
+    double ySpeed = -kP_Lateral * lateralOffset;                    // strafe: centra el robot frente al tag
+    double omega  = -kP_Rotation * tx;                              // rotacion: apunta al tag
 
     // Limitar velocidades
     xSpeed = MathUtil.clamp(xSpeed, -kMaxForwardSpeed, kMaxForwardSpeed);
+    ySpeed = MathUtil.clamp(ySpeed, -kMaxStrafeSpeed,  kMaxStrafeSpeed);
     omega  = MathUtil.clamp(omega,  -kMaxRotSpeed,     kMaxRotSpeed);
 
-    m_drive.driveRobotRelative(new ChassisSpeeds(xSpeed, 0, omega));
+    m_drive.driveRobotRelative(new ChassisSpeeds(xSpeed, ySpeed, omega));
 
-    SmartDashboard.putNumber("GoToTag/Dist_m",    distance);
-    SmartDashboard.putNumber("GoToTag/DistErr_m", distance - m_resolvedDistance);
-    SmartDashboard.putNumber("GoToTag/tx_deg",    tx);
-    SmartDashboard.putString("GoToTag/Status",    "NAVEGANDO");
+    SmartDashboard.putNumber("GoToTag/Dist_m",      distance);
+    SmartDashboard.putNumber("GoToTag/DistErr_m",   distance - m_resolvedDistance);
+    SmartDashboard.putNumber("GoToTag/Lateral_m",   lateralOffset);
+    SmartDashboard.putNumber("GoToTag/tx_deg",      tx);
+    SmartDashboard.putString("GoToTag/Status",      "NAVEGANDO");
   }
 
   @Override
@@ -158,14 +168,16 @@ public class GoToAprilTagCommand extends Command {
     // Timeout de seguridad
     if (m_timer.get() > VisionConstants.kGoToAprilTagTimeoutSeconds) return true;
 
-    // Verificar si llegamos
+    // Verificar si llegamos en los 3 ejes
     if (!m_vision.isSeeingTag(m_resolvedTagId)) return false;
-    double[] targetPose = m_vision.getTargetPoseRobotSpace();
-    double distance = (targetPose.length >= 3) ? Math.abs(targetPose[2]) : 0;
+    double[] targetPose  = m_vision.getTargetPoseRobotSpace();
+    double distance      = (targetPose.length >= 3) ? Math.abs(targetPose[2]) : 0;
+    double lateralOffset = (targetPose.length >= 1) ? targetPose[0] : 0;
 
-    boolean atDistance = Math.abs(distance - m_resolvedDistance) < kDistanceTolerance;
-    boolean centered   = Math.abs(m_vision.getTx()) < kTxTolerance;
-    return atDistance && centered;
+    boolean atDistance  = Math.abs(distance - m_resolvedDistance) < kDistanceTolerance;
+    boolean atCenter    = Math.abs(lateralOffset) < kLateralTolerance;
+    boolean facingTag   = Math.abs(m_vision.getTx()) < kTxTolerance;
+    return atDistance && atCenter && facingTag;
   }
 
   @Override
