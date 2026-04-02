@@ -5,19 +5,25 @@
 package frc.robot;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.filter.SlewRateLimiter;
 import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.auto.NamedCommands;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.XboxController;
-import edu.wpi.first.wpilibj.PS4Controller.Button;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants.OIConstants;
 import frc.robot.commands.GoToAprilTagCommand;
 import frc.robot.subsystems.DriveSubsystem;
+import frc.robot.subsystems.Intake;
+import frc.robot.subsystems.Shooter;
 import frc.robot.subsystems.VisionSubsystem;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
+import java.util.Optional;
 
 /*
  * This class is where the bulk of the robot should be declared.  Since Command-based is a
@@ -28,25 +34,40 @@ import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 public class RobotContainer {
   // The robot's subsystems
   private final DriveSubsystem m_robotDrive = new DriveSubsystem();
-  private final VisionSubsystem m_vision = new VisionSubsystem();
+  private final VisionSubsystem m_vision = new VisionSubsystem(m_robotDrive);
+
+  private final Shooter m_shooter = new Shooter();
+  private final Intake m_intake = new Intake();
+
 
   // The driver's controller
   XboxController m_driverController = new XboxController(OIConstants.kDriverControllerPort);
 
-  /** PathPlanner auto chooser; null when PathPlanner config is not present. */
-  private final SendableChooser<Command> m_pathPlannerChooser;
+  // Slew rate limiters: suavizan la aceleracion del joystick para evitar movimientos bruscos.
+  // El valor (ej. 2.5) = unidades por segundo; 2.5 → llega a full stick en ~0.4 segundos.
+  private final SlewRateLimiter m_xLimiter   = new SlewRateLimiter(2.5);
+  private final SlewRateLimiter m_yLimiter   = new SlewRateLimiter(2.5);
+  private final SlewRateLimiter m_rotLimiter = new SlewRateLimiter(2.0);
+
+  /** Starting position chooser (1, 2, or 3). Alliance is read from DriverStation automatically. */
+  private final SendableChooser<Integer> m_positionChooser = new SendableChooser<>();
 
   /**
    * The container for the robot. Contains subsystems, OI devices, and commands.
    */
   public RobotContainer() {
-    // PathPlanner: build chooser when AutoBuilder was configured (has RobotConfig from GUI)
-    if (AutoBuilder.isConfigured()) {
-      m_pathPlannerChooser = AutoBuilder.buildAutoChooser("auto1");
-      SmartDashboard.putData("Auto Chooser", m_pathPlannerChooser);
-    } else {
-      m_pathPlannerChooser = null;
-    }
+    // Named commands must be registered BEFORE buildAutoChooser so PathPlanner can find them.
+    NamedCommands.registerCommand("Shoot",
+        Commands.run(() -> m_shooter.shoot(), m_shooter)
+            .withTimeout(10)
+            .andThen(new InstantCommand(() -> m_shooter.shooterStop(), m_shooter)));
+
+    // Starting position chooser: driver selects 1, 2, or 3 on SmartDashboard.
+    // Alliance (Red/Blue) is read automatically from the DriverStation at match start.
+    m_positionChooser.setDefaultOption("Posicion 1", 1);
+    m_positionChooser.addOption("Posicion 2", 2);
+    m_positionChooser.addOption("Posicion 3", 3);
+    SmartDashboard.putData("Posicion Inicio", m_positionChooser);
 
     // Configure the button bindings
     configureButtonBindings();
@@ -57,9 +78,9 @@ public class RobotContainer {
         // Turning is controlled by the X axis of the right stick.
         new RunCommand(
             () -> m_robotDrive.drive(
-                -MathUtil.applyDeadband(m_driverController.getLeftY(), OIConstants.kDriveDeadband),
-                -MathUtil.applyDeadband(m_driverController.getLeftX(), OIConstants.kDriveDeadband),
-                -MathUtil.applyDeadband(m_driverController.getRightX(), OIConstants.kDriveDeadband),
+                m_xLimiter.calculate(-MathUtil.applyDeadband(m_driverController.getLeftY(), OIConstants.kDriveDeadband)),
+                m_yLimiter.calculate(-MathUtil.applyDeadband(m_driverController.getLeftX(), OIConstants.kDriveDeadband)),
+                m_rotLimiter.calculate(-MathUtil.applyDeadband(m_driverController.getRightX(), OIConstants.kDriveDeadband)),
                 true),
             m_robotDrive));
   }
@@ -74,7 +95,7 @@ public class RobotContainer {
    * {@link JoystickButton}.
    */
   private void configureButtonBindings() {
-    new JoystickButton(m_driverController, Button.kR1.value)
+    new JoystickButton(m_driverController, XboxController.Button.kRightBumper.value)
         .whileTrue(new RunCommand(
             () -> m_robotDrive.setX(),
             m_robotDrive));
@@ -84,25 +105,58 @@ public class RobotContainer {
             () -> m_robotDrive.zeroHeading(),
             m_robotDrive));
 
-    // Teleop: one button = position robot centered in front of AprilTag (fast, with timeout)
+    // Teleop: A = auto-detect (lee el tag visible, busca su grupo, va a la distancia correcta).
+    // Si la camara no ve ningun tag o el tag no esta en TagGroups, el comando aborta sin moverse.
     new JoystickButton(m_driverController, XboxController.Button.kA.value)
-        .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision, 9));
+        .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision));
     new JoystickButton(m_driverController,  XboxController.Button.kB.value)
-        .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision, 10));
+        .onTrue(new GoToAprilTagCommand(m_robotDrive, m_vision));
+    new JoystickButton(m_driverController, XboxController.Button.kX.value)
+        .whileTrue(new RunCommand(() -> m_shooter.shoot(), m_shooter));
+    new JoystickButton(m_driverController, XboxController.Button.kY.value)
+        .whileTrue(new RunCommand(() -> m_intake.intake1(), m_intake));
+
   }
+     
 
   /**
-   * Use this to pass the autonomous command to the main {@link Robot} class.
-   * When PathPlanner is configured, returns the selected auto from the chooser.
-   * Otherwise returns a no-op command (only PathPlanner autos are run).
+   * Builds the autonomous command based on:
+   *  - Alliance: read automatically from DriverStation (set by field/DS).
+   *  - Starting position: chosen by the driver on SmartDashboard (1, 2, or 3).
    *
-   * @return the command to run in autonomous
+   * Auto file must exist in deploy/pathplanner/autos/ with the matching name,
+   * e.g. "Blue1.auto", "Red2.auto", "Blue3.auto".
    */
   public Command getAutonomousCommand() {
-    if (m_pathPlannerChooser != null) {
-      return m_pathPlannerChooser.getSelected();
+    if (!AutoBuilder.isConfigured()) {
+      System.out.println("[Auto] PathPlanner no configurado. Sin auto.");
+      return new InstantCommand();
     }
-    return new InstantCommand();
+
+    Optional<DriverStation.Alliance> alliance = DriverStation.getAlliance();
+    String allianceName = (alliance.isPresent() && alliance.get() == DriverStation.Alliance.Red)
+        ? "Red" : "Blue";
+    int position = m_positionChooser.getSelected();
+    String autoName = allianceName + position; // e.g. "Blue2", "Red3"
+
+    System.out.println("[Auto] Alianza=" + allianceName + " | Posicion=" + position
+        + " | Cargando auto: " + autoName);
+    SmartDashboard.putString("Auto/Seleccionado", autoName);
+
+    try {
+      return AutoBuilder.buildAuto(autoName);
+    } catch (Exception e) {
+      // Alliance+position auto not found — fall back to "auto1" (default test auto)
+      System.out.println("[Auto] Auto '" + autoName + "' no encontrado. Usando 'auto1' como respaldo.");
+      SmartDashboard.putString("Auto/Seleccionado", autoName + " -> auto1 (respaldo)");
+      try {
+        return AutoBuilder.buildAuto("auto1");
+      } catch (Exception e2) {
+        System.out.println("[Auto] 'auto1' tampoco encontrado. Sin auto.");
+        SmartDashboard.putString("Auto/Seleccionado", "NINGUNO");
+        return new InstantCommand();
+      }
+    }
   }
 
 }
