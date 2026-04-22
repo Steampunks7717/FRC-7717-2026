@@ -60,7 +60,7 @@ public class VisionSubsystem extends SubsystemBase {
     SmartDashboard.putNumber("Vision/tx", getTx());
     SmartDashboard.putNumber("Vision/ty", getTy());
 
-    // Step 3: fuse into pose estimator only when a valid target is seen
+    // Step 3: fuse into pose estimator only when measurement is valid and fresh
     if (targetSeen && botpose.length >= 7) {
       double latencyMs  = botpose[6];
       Pose2d visionPose = new Pose2d(botpose[0], botpose[1],
@@ -70,8 +70,16 @@ public class VisionSubsystem extends SubsystemBase {
       SmartDashboard.putNumber("Vision/BotPose_X", visionPose.getX());
       SmartDashboard.putNumber("Vision/BotPose_Y", visionPose.getY());
       SmartDashboard.putNumber("Vision/BotPose_Yaw", visionPose.getRotation().getDegrees());
+      SmartDashboard.putNumber("Vision/LatencyMs", latencyMs);
 
-      m_drive.addVisionMeasurement(visionPose, timestamp);
+      // Reject stale or zero poses (limelight not ready / no lock)
+      boolean poseValid = latencyMs < 100
+          && (visionPose.getX() != 0 || visionPose.getY() != 0);
+      SmartDashboard.putBoolean("Vision/PoseValid", poseValid);
+
+      if (poseValid) {
+        m_drive.addVisionMeasurement(visionPose, timestamp);
+      }
     }
   }
 
@@ -107,8 +115,38 @@ public class VisionSubsystem extends SubsystemBase {
   /** Returns the field pose of the given AprilTag from the 2026 Rebuilt layout. */
   public Pose2d getTagPoseFromLayout(int tagId) {
     return switch (tagId) {
+      case 1  -> VisionConstants.kTag1FieldPose;
+      case 2  -> VisionConstants.kTag2FieldPose;
+      case 3  -> VisionConstants.kTag3FieldPose;
+      case 4  -> VisionConstants.kTag4FieldPose;
+      case 5  -> VisionConstants.kTag5FieldPose;
+      case 6  -> VisionConstants.kTag6FieldPose;
+      case 7  -> VisionConstants.kTag7FieldPose;
+      case 8  -> VisionConstants.kTag8FieldPose;
       case 9  -> VisionConstants.kTag9FieldPose;
       case 10 -> VisionConstants.kTag10FieldPose;
+      case 11 -> VisionConstants.kTag11FieldPose;
+      case 12 -> VisionConstants.kTag12FieldPose;
+      case 13 -> VisionConstants.kTag13FieldPose;
+      case 14 -> VisionConstants.kTag14FieldPose;
+      case 15 -> VisionConstants.kTag15FieldPose;
+      case 16 -> VisionConstants.kTag16FieldPose;
+      case 17 -> VisionConstants.kTag17FieldPose;
+      case 18 -> VisionConstants.kTag18FieldPose;
+      case 19 -> VisionConstants.kTag19FieldPose;
+      case 20 -> VisionConstants.kTag20FieldPose;
+      case 21 -> VisionConstants.kTag21FieldPose;
+      case 22 -> VisionConstants.kTag22FieldPose;
+      case 23 -> VisionConstants.kTag23FieldPose;
+      case 24 -> VisionConstants.kTag24FieldPose;
+      case 25 -> VisionConstants.kTag25FieldPose;
+      case 26 -> VisionConstants.kTag26FieldPose;
+      case 27 -> VisionConstants.kTag27FieldPose;
+      case 28 -> VisionConstants.kTag28FieldPose;
+      case 29 -> VisionConstants.kTag29FieldPose;
+      case 30 -> VisionConstants.kTag30FieldPose;
+      case 31 -> VisionConstants.kTag31FieldPose;
+      case 32 -> VisionConstants.kTag32FieldPose;
       default -> null;
     };
   }

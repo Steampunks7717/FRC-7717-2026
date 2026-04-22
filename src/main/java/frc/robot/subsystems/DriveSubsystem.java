@@ -27,6 +27,7 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.Timer;
 import frc.robot.Constants.DriveConstants;
+import frc.robot.Constants.ModuleConstants;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
 public class DriveSubsystem extends SubsystemBase {
@@ -94,6 +95,8 @@ public class DriveSubsystem extends SubsystemBase {
     HAL.report(tResourceType.kResourceType_RobotDrive, tInstances.kRobotDriveSwerve_MaxSwerve);
 
     m_gyro.calibrate();
+    // Sync pose estimator with post-calibration gyro reading
+    resetOdometry(new Pose2d());
 
     // PathPlanner AutoBuilder: load robot config from GUI and configure path following.
     // If no config file exists (e.g. first run), autonomous will use WPILib fallback in RobotContainer.
@@ -140,7 +143,7 @@ public class DriveSubsystem extends SubsystemBase {
     } else {
       // Real robot: update pose estimator from gyro and module positions
       m_poseEstimator.update(
-          Rotation2d.fromDegrees(m_gyro.getAngle()),
+          Rotation2d.fromDegrees(gyroAngle()),
           new SwerveModulePosition[] {
               m_frontLeft.getPosition(),
               m_frontRight.getPosition(),
@@ -195,9 +198,13 @@ public class DriveSubsystem extends SubsystemBase {
   public void driveRobotRelative(ChassisSpeeds speeds) {
     m_lastChassisSpeeds = speeds;
     var states = DriveConstants.kDriveKinematics.toSwerveModuleStates(speeds);
+    // Use physical max speed so PathPlanner can drive at full path velocity
     SwerveDriveKinematics.desaturateWheelSpeeds(
-        states, DriveConstants.kMaxSpeedMetersPerSecond);
-    setModuleStates(states);
+        states, ModuleConstants.kDriveWheelFreeSpeedRps);
+    m_frontLeft.setDesiredState(states[0]);
+    m_frontRight.setDesiredState(states[1]);
+    m_rearLeft.setDesiredState(states[2]);
+    m_rearRight.setDesiredState(states[3]);
   }
 
   /**
@@ -210,7 +217,7 @@ public class DriveSubsystem extends SubsystemBase {
       m_simPose = pose;
     } else {
       m_poseEstimator.resetPosition(
-          Rotation2d.fromDegrees(m_gyro.getAngle()),
+          Rotation2d.fromDegrees(gyroAngle()),
           new SwerveModulePosition[] {
               m_frontLeft.getPosition(),
               m_frontRight.getPosition(),
@@ -252,7 +259,7 @@ public class DriveSubsystem extends SubsystemBase {
     // When not on real robot the gyro doesn't update; use current pose rotation for field-relative
     Rotation2d heading = useIntegratedPose()
         ? getPose().getRotation()
-        : Rotation2d.fromDegrees(m_gyro.getAngle());
+        : Rotation2d.fromDegrees(gyroAngle());
     ChassisSpeeds chassisSpeeds = fieldRelative
         ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered, heading)
         : new ChassisSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered);
@@ -318,7 +325,7 @@ public class DriveSubsystem extends SubsystemBase {
    * @return the robot's heading in degrees, from -180 to 180
    */
   public double getHeading() {
-    return Rotation2d.fromDegrees(m_gyro.getAngle()).getDegrees();
+    return Rotation2d.fromDegrees(gyroAngle()).getDegrees();
   }
 
   /**
