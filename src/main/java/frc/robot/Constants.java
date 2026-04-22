@@ -26,8 +26,8 @@ import edu.wpi.first.math.util.Units;
 public final class Constants {
   public static final class DriveConstants {
     // Driving Parameters - matched to PathPlanner settings.json (maxDriveSpeed=3, defaultMaxAngVel=540 deg/s)
-    public static final double kMaxSpeedMetersPerSecond = 3;       // m/s
-    public static final double kMaxAngularSpeed = 3 * Math.PI;    // rad/s (~540 deg/s)
+    public static final double kMaxSpeedMetersPerSecond = 0.3;       // m/s
+    public static final double kMaxAngularSpeed = 0.25 * Math.PI;    // rad/s (~540 deg/s)
 
     // Chassis configuration
     public static final double kTrackWidth = Units.inchesToMeters(24.5);
@@ -57,7 +57,7 @@ public final class Constants {
     public static final int kFrontRightTurningCanId = 1;
     public static final int kRearRightTurningCanId = 7;
 
-    public static final boolean kGyroReversed = false;
+    public static final boolean kGyroReversed = true;
   }
 
   public static final class ModuleConstants {
@@ -99,18 +99,49 @@ public final class Constants {
      * Tags 9 and 10 are on the Red Reef structure, facing 0° (toward +X / Red wall).
      * Source: wpilibsuite/allwpilib 2026-rebuilt-welded.json
      */
-    public static final Pose2d kTag9FieldPose  = new Pose2d(12.519177, 3.6790376, Rotation2d.fromDegrees(0));
-    public static final Pose2d kTag10FieldPose = new Pose2d(12.519177, 4.0346376, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag1FieldPose  = new Pose2d(11.8779798, 7.4247756, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag2FieldPose  = new Pose2d(11.9154194, 4.638039999999999, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag3FieldPose  = new Pose2d(11.3118646, 4.3902376, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag4FieldPose  = new Pose2d(11.3118646, 4.0346376, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag5FieldPose  = new Pose2d(11.9154194, 3.4312351999999997, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag6FieldPose  = new Pose2d(11.8779798, 0.6444996, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag7FieldPose  = new Pose2d(11.9528844, 0.6444996, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag8FieldPose  = new Pose2d(12.2710194, 3.4312351999999997, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag9FieldPose  = new Pose2d(12.519177399999998, 3.6790375999999996, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag10FieldPose = new Pose2d(12.519177399999998, 4.0346376, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag11FieldPose = new Pose2d(12.2710194, 4.638039999999999, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag12FieldPose = new Pose2d(11.9528844, 7.4247756, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag13FieldPose = new Pose2d(16.5333172, 7.4033126, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag14FieldPose = new Pose2d(16.5333172, 6.9715126, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag15FieldPose = new Pose2d(16.5329616, 4.3235626, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag16FieldPose = new Pose2d(16.5329616, 3.8917626, Rotation2d.fromDegrees(0));
+
+    public static final Pose2d kTag17FieldPose = new Pose2d(4.6630844, 0.6444996, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag18FieldPose = new Pose2d(4.6256194, 3.4312351999999997, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag19FieldPose = new Pose2d(5.229174199999999, 3.6790375999999996, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag20FieldPose = new Pose2d(5.229174199999999, 4.0346376, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag21FieldPose = new Pose2d(4.6256194, 4.638039999999999, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag22FieldPose = new Pose2d(4.6630844, 4.5881798, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag23FieldPose = new Pose2d(4.5881798, 7.424775, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag24FieldPose = new Pose2d(4.2700194, 4.638039999999999, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag25FieldPose = new Pose2d(4.0218614, 4.3902376, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag26FieldPose = new Pose2d(4.0218614, 4.0346376, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag27FieldPose = new Pose2d(4.2700194, 3.4312351999999997, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag28FieldPose = new Pose2d(4.5881798, 0.6444996, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag29FieldPose = new Pose2d(0.0077469999999999995, 0.6659626, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag30FieldPose = new Pose2d(0.0077469999999999995, 1.0977626, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag31FieldPose = new Pose2d(0.0080772, 3.7457125999999996, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTag32FieldPose = new Pose2d(0.0080772, 4.1775126, Rotation2d.fromDegrees(0));
     /** Limelight NetworkTable name. */
     public static final String kLimelightTableName = "limelight";
   }
 
   public static final class AutoConstants {
     // Matched to PathPlanner settings.json (defaultMaxVel=3, defaultMaxAccel=3, defaultMaxAngVel=540, defaultMaxAngAccel=720)
-    public static final double kMaxSpeedMetersPerSecond = 3;
-    public static final double kMaxAccelerationMetersPerSecondSquared = 3;
-    public static final double kMaxAngularSpeedRadiansPerSecond = 3 * Math.PI;     // rad/s (~540 deg/s)
-    public static final double kMaxAngularSpeedRadiansPerSecondSquared = 4 * Math.PI; // rad/s^2 (~720 deg/s^2)
+    public static final double kMaxSpeedMetersPerSecond = 1;
+    public static final double kMaxAccelerationMetersPerSecondSquared = 1;
+    public static final double kMaxAngularSpeedRadiansPerSecond = 1 * Math.PI;     // rad/s (~540 deg/s)
+    public static final double kMaxAngularSpeedRadiansPerSecondSquared = 1 * Math.PI; // rad/s^2 (~720 deg/s^2)
 
     public static final double kPXController = 1;
     public static final double kPYController = 1;

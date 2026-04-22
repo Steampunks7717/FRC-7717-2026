@@ -8,6 +8,7 @@ import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.path.PathConstraints;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.Constants.AutoConstants;
 import frc.robot.Constants.VisionConstants;
@@ -48,8 +49,36 @@ public class GoToAprilTagCommand extends Command {
   public void initialize() {
     m_pathfindCommand = null;
 
+    int seenId = m_vision.getTargetId();
+    boolean cameraSeesTag = m_vision.isSeeingTag(m_tagId);
+    System.out.println("[GoToAprilTag] Comando iniciado para tag " + m_tagId
+        + " | Camara ve: " + m_vision.hasTarget()
+        + " | Tag que ve ahora: " + seenId
+        + " | Ve el tag correcto: " + cameraSeesTag);
+
+    SmartDashboard.putNumber("GoToTag/TargetTagId", m_tagId);
+    SmartDashboard.putBoolean("GoToTag/CameraSeesTarget", cameraSeesTag);
+    SmartDashboard.putNumber("GoToTag/CameraSeenId", seenId);
+
+    Pose2d currentPose = m_drive.getPose();
+    System.out.println("[GoToAprilTag] Pose actual del robot: X=" + currentPose.getX()
+        + " Y=" + currentPose.getY()
+        + " Yaw=" + currentPose.getRotation().getDegrees() + "deg");
+
     Pose2d target = m_vision.getTargetPoseInFrontOfTag(m_tagId, m_distanceMeters);
-    if (target == null) return; // tag not in layout → end immediately
+    if (target == null) {
+      System.out.println("[GoToAprilTag] Tag " + m_tagId + " NO esta en el layout. Comando terminado.");
+      SmartDashboard.putString("GoToTag/Status", "TAG_NOT_IN_LAYOUT");
+      return;
+    }
+
+    System.out.println("[GoToAprilTag] Destino calculado: X=" + target.getX()
+        + " Y=" + target.getY()
+        + " Yaw=" + target.getRotation().getDegrees() + "deg");
+    SmartDashboard.putNumber("GoToTag/TargetPose_X", target.getX());
+    SmartDashboard.putNumber("GoToTag/TargetPose_Y", target.getY());
+    SmartDashboard.putNumber("GoToTag/TargetPose_Yaw", target.getRotation().getDegrees());
+    SmartDashboard.putString("GoToTag/Status", "NAVEGANDO");
 
     PathConstraints constraints = new PathConstraints(
         AutoConstants.kMaxSpeedMetersPerSecond,
@@ -80,5 +109,7 @@ public class GoToAprilTagCommand extends Command {
       m_pathfindCommand.end(interrupted);
     }
     m_drive.driveRobotRelative(new ChassisSpeeds());
+    SmartDashboard.putString("GoToTag/Status", interrupted ? "INTERRUMPIDO" : "COMPLETADO");
+    System.out.println("[GoToAprilTag] Comando terminado. Interrumpido: " + interrupted);
   }
 }
