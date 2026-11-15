@@ -17,7 +17,9 @@ import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.PS4Controller.Button;
 import frc.robot.Constants.AutoConstants;
 import frc.robot.Constants.DriveConstants;
+import frc.robot.Constants.ApproachTagConstants;
 import frc.robot.Constants.OIConstants;
+import frc.robot.commands.ApproachTagCommand;
 import frc.robot.subsystems.DriveSubsystem;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
@@ -78,6 +80,9 @@ public class RobotContainer {
         .onTrue(new InstantCommand(
             () -> m_robotDrive.zeroHeading(),
             m_robotDrive));
+
+    new JoystickButton(m_driverController, XboxController.Button.kY.value)
+        .toggleOnTrue(new ApproachTagCommand(m_robotDrive).withTimeout(ApproachTagConstants.kTeleopTimeoutSeconds));
   }
 
   /**

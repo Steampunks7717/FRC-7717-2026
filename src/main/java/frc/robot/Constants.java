@@ -81,6 +81,20 @@ public final class Constants {
     public static final double kDriveDeadband = 0.05;
   }
 
+  public static final class ApproachTagConstants {
+    public static final String kLimelightTableName = "limelight";
+    public static final double kTargetDistanceMeters = 1.0;
+    public static final double kDistanceToleranceMeters = 0.05;
+    public static final double kAngleToleranceDegrees = 2.0;
+    public static final double kDistanceP = 1.0;
+    public static final double kRotationPPerDegree = 0.03;
+    public static final int kMaxStaleCycles = 10;
+    public static final double kTeleopTimeoutSeconds = 10.0;
+    public static final double kMinOutput = 0.25;
+    public static final double kMinValidDistanceMeters = 0.1;
+    public static final double kMaxOutput = 1.0;
+  }
+
   public static final class AutoConstants {
     public static final double kMaxSpeedMetersPerSecond = 3;
     public static final double kMaxAccelerationMetersPerSecondSquared = 3;
