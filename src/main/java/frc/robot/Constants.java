@@ -95,6 +95,14 @@ public final class Constants {
     public static final double kMaxOutput = 1.0;
   }
 
+  public static final class PathPlannerConstants {
+    public static final double kTranslationP = 5.0;
+    public static final double kRotationP = 5.0;
+    public static final boolean kFlipForRedAlliance = false;
+    public static final String kApproachTagCommandName = "AcercarseATag";
+    public static final double kApproachTagTimeoutSeconds = 5.0;
+  }
+
   public static final class AutoConstants {
     public static final double kMaxSpeedMetersPerSecond = 3;
     public static final double kMaxAccelerationMetersPerSecondSquared = 3;
