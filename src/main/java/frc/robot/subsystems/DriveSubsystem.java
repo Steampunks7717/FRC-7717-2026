@@ -185,6 +185,15 @@ public class DriveSubsystem extends SubsystemBase {
     };
   }
 
+  public SwerveModuleState[] getDesiredModuleStates() {
+    return new SwerveModuleState[] {
+        m_frontLeft.getDesiredState(),
+        m_frontRight.getDesiredState(),
+        m_rearLeft.getDesiredState(),
+        m_rearRight.getDesiredState()
+    };
+  }
+
   public ChassisSpeeds getRobotRelativeSpeeds() {
     return DriveConstants.kDriveKinematics.toChassisSpeeds(getModuleStates());
   }
